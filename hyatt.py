@@ -2,7 +2,9 @@ import datetime
 import requests
 import shutil
 import sys
+import time
 import urllib
+from pprint import pprint as pp
 
 from bs4 import BeautifulSoup
 from Crypto.Cipher import AES
@@ -34,7 +36,7 @@ pip install pycrypto
 ###############################
 ###############################
 
-SCRAPE_START = '2025-04-20'
+SCRAPE_START = '2024-04-20'
 SCRAPE_END   = '2025-05-01'
 NIGHTS = 2
 
@@ -45,46 +47,50 @@ NIGHTS = 2
 DELAY_SECS = 1
 HEADERS = {
     'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36',
+    'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7',
+    'Accept-Encoding': 'gzip, deflate, br, zstd',
+    'Accept-Language': 'en-US,en;q=0.9',
+    'Dnt': '1',
+    'Sec-Ch-Ua': '"Google Chrome";v="123", "Not:A-Brand";v="8", "Chromium";v="123"',
+    'Sec-Ch-Ua-Mobile': '?0',
+    'Sec-Ch-Ua-Platform': '"macOS"',
+    'Sec-Fetch-Dest': 'document',
+    'Sec-Fetch-Mode': 'navigate',
+    'Sec-Fetch-Site': 'none',
+    'Sec-Fetch-User': '?1',
+    'Upgrade-Insecure-Requests': '1',
 }
 WAIT_MSG = '[Attention] Cookie expired. Refresh the booking page in Chrome. Script will automatically continue after.'
 
 
-def make_request(url, checkin_dt, checkout_dt):
-    location = url.split('?')[0].split('/')[-1]
+def make_request(checkin_dt, checkout_dt):
+    location = 'Ventana' #url.split('?')[0].split('/')[-1]
     checkin = checkin_dt.strftime('%Y-%m-%d')
     checkout = checkout_dt.strftime('%Y-%m-%d')
-    formatted_url = f'https://www.hyatt.com/shop/rates/{location}?checkinDate={checkin}&checkoutDate={checkout}&rooms=1&adults=2&kids=0&rate=Standard&rateFilter=woh'
+    formatted_url = f'https://www.hyatt.com/shop/service/rooms/roomrates/sjcal?spiritCode=sjcal&rooms=1&adults=1&location=Alila%20Ventana%20Big%20Sur&checkinDate={checkin}&checkoutDate={checkout}&kids=0&rate=Standard&rateFilter=woh'
     response = requests.get(formatted_url, headers=HEADERS)
-    print(response.status_code)
+    if response.status_code != 200:
+        # print(f'failed to fetch {formatted_url}')
+        return False
     if response.text == '':
-        print('empty')
-    soup = BeautifulSoup(response.content, 'html.parser')
-    tabs = soup.find('div', {'class': 'hbe-header_wohNavTabs'})
-    bookings = soup.find_all('div', {'class': 'p-rate-card'})
+        # print(f'empty response {formatted_url}')
+        return False
     availability = []
-    results = 0
-    for booking in bookings:
-        room = booking.find('div', {'class': 'rate-room-title'}).text
-        rate = booking.find('div', {'class': 'rate'}).text
-        if rate:
-            results += 1
-        if '$' not in rate:
-            availability.append((rate, room))
+    data = response.json()
+    for _, info in data['roomRates'].items():
+        rate = info['lowestAvgPointValue']
+        if rate == None:
+            continue
+        rate = (str(rate)[::-1].replace('000', 'k'))[::-1]
+        room = info['roomType']['title']
+        availability.append((rate, room))
     dates = '{} - {}: '.format(checkin_dt.strftime('%a %m/%d/%y'), checkout_dt.strftime('%a %m/%d/%y'))
+    for i, r in enumerate(availability):
+        rate_room = f'[{r[0]}] {r[1]}'
+        dts = dates if i == 0  else " " * 29
+        print(f"{dts}{rate_room}{' '*len(WAIT_MSG)}"[:len(WAIT_MSG)])
     if not availability:
-        if results > 0 or ((soup.findAll('div', {'class': 'Alert_m_booking_alert__uw_Ah'}) or soup.findAll('div', {'class': 'search-hbj'}))):
-            # No results were found.
-            print(f"{dates}{' '*len(WAIT_MSG)}"[:len(WAIT_MSG)])
-        else:
-            # Cookie expired.
-            # import pdb; pdb.set_trace()
-            # print(soup.prettify())
-            return False
-    else:
-        for i, r in enumerate(availability):
-            rate_room = f'[{r[0]}] {r[1]}'
-            dts = dates if i == 0  else " " * 29
-            print(f"{dts}{rate_room}{' '*len(WAIT_MSG)}"[:len(WAIT_MSG)])
+        print(f"{dates}{' '*len(WAIT_MSG)}"[:len(WAIT_MSG)])
     return True
 
 
@@ -92,9 +98,7 @@ def scrape(scrape_start, scrape_end, nights):
     latest_booking_dt = datetime.datetime.now() + datetime.timedelta(days=394)
     checkin_dt = datetime.datetime.strptime(scrape_start, '%Y-%m-%d')
     end_dt = datetime.datetime.strptime(scrape_end, '%Y-%m-%d')
-    hotel_name, url = get_hotel_and_url()
-    print(f'{"#"*80}\n{hotel_name}, {nights} nights\n{"#"*80}')
-    refresh_cookie()
+    print(f'{"#"*80}\nVentana, {nights} nights\n{"#"*80}')
     while checkin_dt <= end_dt:
         checkout_dt = checkin_dt + datetime.timedelta(days=nights)
         if checkout_dt >= latest_booking_dt:
@@ -103,14 +107,15 @@ def scrape(scrape_start, scrape_end, nights):
         succeeded = False
         failed_count = 0
         while not succeeded:
-            succeeded = make_request(url, checkin_dt, checkout_dt)
+            succeeded = make_request(checkin_dt, checkout_dt)
             if not succeeded:
                 if failed_count == 1:
                     print(WAIT_MSG, end='')
                     print('\r', end='')
                 failed_count += 1
-                refresh_cookie()
-                sleep(1)
+                clear_cookie()
+                fetch_cookie()
+                sleep(5)
         checkin_dt = checkin_dt + datetime.timedelta(days=1)
 
 
@@ -121,43 +126,52 @@ def decrypt_cookie_value(encrypted_value, master_key):
     return decrypted[:-decrypted[-1]].decode('utf8') if decrypted else ''
 
 
-def refresh_cookie():
+def clear_cookie():
+    with dbapi2.connect(f'{expanduser("~")}/ChromeCookies.tmp') as conn:
+        conn.rollback()
+        rows1 = conn.cursor().execute('DELETE FROM cookies WHERE host_key like ".hyatt.com"')
+        rows2 = conn.cursor().execute('DELETE FROM cookies WHERE host_key like "www.hyatt.com"')
+
+
+def fetch_cookie():
     master_key = Popen(['security', 'find-generic-password', '-w', '-a', 'Chrome', '-s', 'Chrome Safe Storage'], stdout=PIPE).stdout.read().strip()
-    shutil.copy(f'{expanduser("~")}/Library/Application Support/Google/Chrome/Profile 2/Cookies', f'{expanduser("~")}/ChromeCookies.tmp')
+    shutil.copy(f'{expanduser("~")}/Library/Application Support/Google/Chrome/Default/Cookies', f'{expanduser("~")}/ChromeCookies.tmp')
     with dbapi2.connect(f'{expanduser("~")}/ChromeCookies.tmp') as conn:
         conn.rollback()
         rows1 = conn.cursor().execute('SELECT name, encrypted_value FROM cookies WHERE host_key like ".hyatt.com"')
         rows2 = conn.cursor().execute('SELECT name, encrypted_value FROM cookies WHERE host_key like "www.hyatt.com"')
-        # import pdb; pdb.set_trace()
     cookie = ''
     for name, enc_val in rows1:
         val = decrypt_cookie_value(enc_val, master_key)
         if val:
+            if name == 'utag_main_ses_id':
+                val = str(int(time.time()) * 100) + val[13:]
+                print(f'===================== {val}')
             cookie += f'{name}={val}; '
     for name, enc_val in rows2:
         val = decrypt_cookie_value(enc_val, master_key)
         if val:
+            if name == 'utag_main_ses_id':
+                val = str(int(time.time()) * 100 + 10000) + val[13:]
+                print(f'===================== {val}')
             cookie += f'{name}={val}; '
+    old = HEADERS.get('cookie', '')
+    if not cookie:
+        return('')
     HEADERS['cookie'] = cookie.strip()
-
-
-def get_hotel_and_url():
-    # shutil.copy(f'{expanduser("~")}/Library/Application Support/Google/Chrome/Default/History', f'{expanduser("~")}/ChromeHistory.tmp')
-    # with dbapi2.connect(f'{expanduser("~")}/ChromeHistory.tmp') as conn:
-    #     conn.rollback()
-    #     rows = conn.cursor().execute(
-    #         "SELECT last_visit_time, url FROM urls where url like 'https://www.hyatt.com/shop/%' order by last_visit_time desc")
-    # recent, *_ = rows
-    # url = recent[1]
-    # hotel_name = urllib.parse.parse_qs(urllib.parse.urlparse(url).query)['location'][0]
-    # return hotel_name, url
-    return 'Ventana', 'https://www.hyatt.com/shop/rooms/sjcal?location=Alila+Ventana+Big+Sur&checkinDate=2025-04-22&checkoutDate=2025-04-25&rooms=1&adults=2&kids=0&rate=Standard&rateFilter=woh'
+    old_d = set([x.strip() for x in old.split(';')])
+    print(f'old: {[str(z) for z in old_d]}')
+    print('new:')
+    for a in cookie.split(';'):
+        if a.strip() not in old_d:
+            print(a)
+    return(cookie)
 
 
 if __name__ == '__main__':
     print(f"Waiting {DELAY_SECS} seconds before starting since Chrome doesn't commit history and cookies to disk instantly...")
     sleep(DELAY_SECS)
-    print("If the script isn't looking for the hotel you want, make sure to refresh the page and restart the script.\n")
-    print('https://www.hyatt.com/shop/rooms/sjcal?location=Alila%20Ventana%20Big%20Sur&checkinDate=2025-04-20&checkoutDate=2025-04-23&rooms=1&adults=1&kids=0&rate=Standard&rateFilter=woh')
+    print("https://www.google.com/search?q=hyatt&sca_esv=98cc110fba7c9a23&sxsrf=ACQVn08M5E9GcXlaopTGBLoa8Wbm6T-qlw%3A1713060399178&ei=LzobZrm4CpvKp84Pm86R6A8&ved=0ahUKEwj5i8mkz8CFAxUb5ckDHRtnBP0Q4dUDCBE&uact=5&oq=hyatt&gs_lp=Egxnd3Mtd2l6LXNlcnAiBWh5YXR0MgQQABhHMgQQABhHMgQQABhHMgQQABhHMgQQABhHMgQQABhHMgQQABhHMgQQABhHSKoEULMBWLMBcAF4ApABAJgBAKABAKoBALgBA8gBAPgBAZgCAqACB8ICBxAjGLADGCfCAgoQABhHGNYEGLADwgINEAAYRxjWBBjJAxiwA8ICDhAAGIAEGIoFGJIDGLADwgIOEAAY5AIY1gQYsAPYAQHCAhkQLhiABBiKBRhDGMcBGNEDGMgDGLAD2AECwgIXEC4YgAQY5wQYxwEY0QMYyAMYsAPYAQKYAwDiAwUSATEgQIgGAZAGCLoGBggBEAEYCboGBggCEAEYCJIHATKgBwA&sclient=gws-wiz-serp")
+    print("chrome://settings/content/all?searchSubpage=hyatt")
     while True:
         scrape(scrape_start=SCRAPE_START, scrape_end=SCRAPE_END, nights=NIGHTS)
