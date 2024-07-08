@@ -67,7 +67,7 @@ HEADERS = {
     'Sec-Fetch-User': '?1',
     'Upgrade-Insecure-Requests': '1',
 }
-WAIT_MSG = '[Attention] Cookie expired. Refresh the booking page in Chrome. Script will automatically continue after.'
+WAIT_MSG = '[Attention] Cookie expired. Do steps 1 and 2 again. Script will continue automatically.'
 
 
 def make_request(checkin_dt, checkout_dt):
