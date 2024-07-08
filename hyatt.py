@@ -69,10 +69,8 @@ def make_request(checkin_dt, checkout_dt):
     formatted_url = f'https://www.hyatt.com/shop/service/rooms/roomrates/sjcal?spiritCode=sjcal&rooms=1&adults=1&location=Alila%20Ventana%20Big%20Sur&checkinDate={checkin}&checkoutDate={checkout}&kids=0&rate=Standard&rateFilter=woh'
     response = requests.get(formatted_url, headers=HEADERS)
     if response.status_code != 200:
-        # print(f'failed to fetch {formatted_url}')
         return False
     if response.text == '':
-        # print(f'empty response {formatted_url}')
         return False
     availability = []
     data = response.json()
@@ -143,27 +141,16 @@ def fetch_cookie():
     for name, enc_val in rows1:
         val = decrypt_cookie_value(enc_val, master_key)
         if val:
-            # if name == 'utag_main_ses_id':
-                # val = str(int(time.time()) * 100) + val[13:]
-                # print(f'===================== {val}')
             cookie += f'{name}={val}; '
     for name, enc_val in rows2:
         val = decrypt_cookie_value(enc_val, master_key)
         if val:
-            # if name == 'utag_main_ses_id':
-                # val = str(int(time.time()) * 100 + 10000) + val[13:]
-                # print(f'===================== {val}')
             cookie += f'{name}={val}; '
     old = HEADERS.get('cookie', '')
     if not cookie:
         return('')
     HEADERS['cookie'] = cookie.strip()
     old_d = set([x.strip() for x in old.split(';')])
-    # print(f'old: {[str(z) for z in old_d]}')
-    # print('new:')
-    # for a in cookie.split(';'):
-        # if a.strip() not in old_d:
-            # print(a)
     return(cookie)
 
 
