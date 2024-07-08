@@ -1,10 +1,6 @@
 import datetime
 import requests
 import shutil
-import sys
-import time
-import urllib
-from pprint import pprint as pp
 
 from bs4 import BeautifulSoup
 from Crypto.Cipher import AES
@@ -15,29 +11,32 @@ from subprocess import PIPE, Popen
 from time import sleep
 
 """
-INSTRUCTIONS:
+PRE-REQUISITES:
+    Install dependencies as needed. This script is meant to run under Python 3. Python 2 might work but is untested.
+    pip3 install beautifulsoup4
+    pip3 install pycrypto
+    
+INSTRUCTIONS (follow every time):
 
-Install dependencies as needed. This script is meant to run under Python 3. Python 2 might work but is untested.
+1. Open this link and delete any hyatt cookies you have: chrome://settings/content/all?searchSubpage=hyatt
+    (bookmark the link in your bookmarks bar so you can use it later)
 
-pip install beautifulsoup4
-pip install pycrypto
-
-1. In Google Chrome, visit any booking results page of the hotel you're interested in. The dates and availability don't matter.
-   Example: https://www.hyatt.com/shop/sjcjc?checkinDate=2025-04-20&checkoutDate=2025-04-23&rooms=1&adults=2&kids=0&rate=Standard&rateFilter=woh
+2. Open this google hyatt search and click on the first result (to create a new cookie locally): https://www.google.com/search?q=hyatt
+    (bookmark the link in your bookmarks bar so you can use it later)
 
 2. Edit the SCRAPE_START, SCRAPE_END, and NIGHTS variables as needed (just below these instructions).
 
-3. Run the script: "python hyatt.py"
+3. Run the script: "python3 hyatt.py"
 
-4. If the "Cookie expired" prompt appears, refresh the booking page in Chrome. 
+4. If the "Cookie expired" prompt appears, perform steps 1 and 2 again.
    The script should continue automatically (usually in 15 to 30 seconds, max 1 min).
 """
 
 ###############################
 ###############################
 
-SCRAPE_START = '2024-04-20'
-SCRAPE_END   = '2025-05-01'
+SCRAPE_START = '2024-08-01'
+SCRAPE_END   = '2025-08-01'
 NIGHTS = 2
 
 ###############################
@@ -46,7 +45,7 @@ NIGHTS = 2
 
 DELAY_SECS = 1
 HEADERS = {
-    'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36',
+    'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36',
     'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7',
     'Accept-Encoding': 'gzip, deflate, br, zstd',
     'Accept-Language': 'en-US,en;q=0.9',
@@ -113,7 +112,7 @@ def scrape(scrape_start, scrape_end, nights):
                     print(WAIT_MSG, end='')
                     print('\r', end='')
                 failed_count += 1
-                clear_cookie()
+                # clear_cookie()
                 fetch_cookie()
                 sleep(5)
         checkin_dt = checkin_dt + datetime.timedelta(days=1)
@@ -127,7 +126,7 @@ def decrypt_cookie_value(encrypted_value, master_key):
 
 
 def clear_cookie():
-    with dbapi2.connect(f'{expanduser("~")}/ChromeCookies.tmp') as conn:
+    with dbapi2.connect(f'/Users/georgeyiu/Library/Application Support/Google/Chrome/Default/Cookies') as conn:
         conn.rollback()
         rows1 = conn.cursor().execute('DELETE FROM cookies WHERE host_key like ".hyatt.com"')
         rows2 = conn.cursor().execute('DELETE FROM cookies WHERE host_key like "www.hyatt.com"')
@@ -144,34 +143,32 @@ def fetch_cookie():
     for name, enc_val in rows1:
         val = decrypt_cookie_value(enc_val, master_key)
         if val:
-            if name == 'utag_main_ses_id':
-                val = str(int(time.time()) * 100) + val[13:]
-                print(f'===================== {val}')
+            # if name == 'utag_main_ses_id':
+                # val = str(int(time.time()) * 100) + val[13:]
+                # print(f'===================== {val}')
             cookie += f'{name}={val}; '
     for name, enc_val in rows2:
         val = decrypt_cookie_value(enc_val, master_key)
         if val:
-            if name == 'utag_main_ses_id':
-                val = str(int(time.time()) * 100 + 10000) + val[13:]
-                print(f'===================== {val}')
+            # if name == 'utag_main_ses_id':
+                # val = str(int(time.time()) * 100 + 10000) + val[13:]
+                # print(f'===================== {val}')
             cookie += f'{name}={val}; '
     old = HEADERS.get('cookie', '')
     if not cookie:
         return('')
     HEADERS['cookie'] = cookie.strip()
     old_d = set([x.strip() for x in old.split(';')])
-    print(f'old: {[str(z) for z in old_d]}')
-    print('new:')
-    for a in cookie.split(';'):
-        if a.strip() not in old_d:
-            print(a)
+    # print(f'old: {[str(z) for z in old_d]}')
+    # print('new:')
+    # for a in cookie.split(';'):
+        # if a.strip() not in old_d:
+            # print(a)
     return(cookie)
 
 
 if __name__ == '__main__':
     print(f"Waiting {DELAY_SECS} seconds before starting since Chrome doesn't commit history and cookies to disk instantly...")
     sleep(DELAY_SECS)
-    print("https://www.google.com/search?q=hyatt&sca_esv=98cc110fba7c9a23&sxsrf=ACQVn08M5E9GcXlaopTGBLoa8Wbm6T-qlw%3A1713060399178&ei=LzobZrm4CpvKp84Pm86R6A8&ved=0ahUKEwj5i8mkz8CFAxUb5ckDHRtnBP0Q4dUDCBE&uact=5&oq=hyatt&gs_lp=Egxnd3Mtd2l6LXNlcnAiBWh5YXR0MgQQABhHMgQQABhHMgQQABhHMgQQABhHMgQQABhHMgQQABhHMgQQABhHMgQQABhHSKoEULMBWLMBcAF4ApABAJgBAKABAKoBALgBA8gBAPgBAZgCAqACB8ICBxAjGLADGCfCAgoQABhHGNYEGLADwgINEAAYRxjWBBjJAxiwA8ICDhAAGIAEGIoFGJIDGLADwgIOEAAY5AIY1gQYsAPYAQHCAhkQLhiABBiKBRhDGMcBGNEDGMgDGLAD2AECwgIXEC4YgAQY5wQYxwEY0QMYyAMYsAPYAQKYAwDiAwUSATEgQIgGAZAGCLoGBggBEAEYCboGBggCEAEYCJIHATKgBwA&sclient=gws-wiz-serp")
-    print("chrome://settings/content/all?searchSubpage=hyatt")
     while True:
         scrape(scrape_start=SCRAPE_START, scrape_end=SCRAPE_END, nights=NIGHTS)
