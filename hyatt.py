@@ -27,6 +27,14 @@ INSTRUCTIONS (follow every time):
 2. Edit the SCRAPE_START, SCRAPE_END, and NIGHTS variables as needed (just below these instructions).
 
 3. Run the script: "python3 hyatt.py"
+   If it looks like it's just hanging, 
+   a. open chrome developer tools (cmd + option + i)
+   b. load the hyatt page https://hyatt.com/
+   c. open the network tab
+   d. scroll up to the first entry in the table "hyatt.com"
+   e. on the Headers tab on the right, scroll to the very bottom and copy the data in the User-Agent field
+   f. paste it over the User-Agent blob below in the HEADERS dictionary
+   g. save file
 
 4. If the "Cookie expired" prompt appears, perform steps 1 and 2 again.
    The script should continue automatically (usually in 15 to 30 seconds, max 1 min).
