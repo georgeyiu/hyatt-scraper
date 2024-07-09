@@ -33,7 +33,7 @@ INSTRUCTIONS (follow every time):
    c. open the network tab
    d. scroll up to the first entry in the table "hyatt.com"
    e. on the Headers tab on the right, scroll to the very bottom and copy the data in the User-Agent field
-   f. paste it over the User-Agent blob below in the HEADERS dictionary
+   f. update USER_AGENT below
    g. save file
 
 4. If the "Cookie expired" prompt appears, perform steps 1 and 2 again.
@@ -42,6 +42,8 @@ INSTRUCTIONS (follow every time):
 
 ###############################
 ###############################
+
+USER_AGENT = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36'
 
 SCRAPE_START = '2024-08-01'
 SCRAPE_END   = '2025-08-01'
@@ -53,7 +55,7 @@ NIGHTS = 2
 
 DELAY_SECS = 1
 HEADERS = {
-    'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36',
+    'User-Agent': USER_AGENT,
     'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7',
     'Accept-Encoding': 'gzip, deflate, br, zstd',
     'Accept-Language': 'en-US,en;q=0.9',
